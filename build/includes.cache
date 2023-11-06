@@ -1,0 +1,32 @@
+[
+  {
+    "Sourcefile": null,
+    "Include": "",
+    "Includepath": "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/cores/esp32"
+  },
+  {
+    "Sourcefile": null,
+    "Include": "",
+    "Includepath": "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/variants/esp32"
+  },
+  {
+    "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/main.ino.cpp",
+    "Include": "CytronMotorDriver.h",
+    "Includepath": "/Users/thomas/Documents/Arduino/libraries/Cytron_Motor_Drivers_Library"
+  },
+  {
+    "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/main.ino.cpp",
+    "Include": "",
+    "Includepath": null
+  },
+  {
+    "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/Encoder.cpp",
+    "Include": "",
+    "Includepath": null
+  },
+  {
+    "Sourcefile": "/Users/thomas/Documents/Arduino/libraries/Cytron_Motor_Drivers_Library/CytronMotorDriver.cpp",
+    "Include": "",
+    "Includepath": null
+  }
+]
