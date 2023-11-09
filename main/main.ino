@@ -68,7 +68,7 @@ void setup() {
 
 void loop() {
   int pos = 0;
-  if(deltaT) {
+  if(deltaT == true) {
     portENTER_CRITICAL(&encoderMux);
     deltaT = false;
     pos = posi;
@@ -91,3 +91,13 @@ void loop() {
 
 
 
+void updateSpeedAndPos() {
+  portENTER_CRITICAL(&encoderMux);
+  deltaT = false;
+  pos = posi;
+  portEXIT_CRITICAL(&encoderMux);
+  float rotations = pos*enc_to_rot;
+  float rpm = veli*enc_to_rot*60;
+
+
+}
