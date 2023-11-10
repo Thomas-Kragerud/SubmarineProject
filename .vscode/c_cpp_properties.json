@@ -218,6 +218,7 @@
                 "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/cores/esp32",
                 "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/variants/esp32",
                 "/Users/thomas/Documents/Arduino/libraries/Cytron_Motor_Drivers_Library",
+                "/Users/thomas/Documents/Arduino/libraries/SparkFunLSM6DSO",
                 "/Users/thomas/Library/Arduino15/packages/esp32/tools/xtensa-esp32-elf-gcc/esp-2021r2-patch5-8.4.0/xtensa-esp32-elf/include/c++/8.4.0",
                 "/Users/thomas/Library/Arduino15/packages/esp32/tools/xtensa-esp32-elf-gcc/esp-2021r2-patch5-8.4.0/xtensa-esp32-elf/include/c++/8.4.0/xtensa-esp32-elf",
                 "/Users/thomas/Library/Arduino15/packages/esp32/tools/xtensa-esp32-elf-gcc/esp-2021r2-patch5-8.4.0/xtensa-esp32-elf/include/c++/8.4.0/backward",
