@@ -1,11 +1,23 @@
+#define BLYNK_TEMPLATE_ID "TMPL2CNVjjOoK"
+#define BLYNK_TEMPLATE_NAME "LED ESP32"
+#define BLYNK_FIRMWARE_VERSION        "0.1.0"
+
+
+
 #include "CytronMotorDriver.h"
 #include "SparkFunLSM6DSO.h"
-#include "Wire"
+#include <Wire.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <BlynkSimpleEsp32.h>
 
+#include "BlynkEdgent.h"
+// Authentication for the Blynk app 
 
+
+
+#define BLYNK_PRINT Serial
+#define APP_DEBUG
 #define EIN_A 26 // YELLOW  Encoder
 #define EIN_B 25 // WHITE   Encoder 
 
@@ -19,10 +31,6 @@
 
 #define POT 34 //yellow potentiometer 
 
-// Authentication for the Blynk app 
-#define BLYNK_TEMPLATE_ID "TMPL2CNVjjOoK"
-#define BLYNK_TEMPLATE_NAME "LED ESP32"
-#define BLYNK_FIRMWARE_VERSION        "0.1.0"
 
 
 
@@ -117,7 +125,7 @@ BLYNK_WRITE(V0)
 
 void setup() {
   Serial.begin(9600);
-  delay(500); 
+  delay(500);
 
   pinMode(EIN_A, INPUT_PULLUP);
   pinMode(EIN_B, INPUT_PULLUP);
@@ -130,7 +138,7 @@ void setup() {
 
 
   // Setup for IMU
-  Wire.begin(I2C_SDA, I2C_SCL)
+  Wire.begin(I2C_SDA, I2C_SCL);
   if(myIMU.begin()){
     Serial.println("IMU Ready");
   } else {
@@ -147,6 +155,7 @@ void setup() {
 
 void loop() {
   delay(10);
+  Serial.println("Hey");
   BlynkEdgent.run();
   int pos = 0;
   if(deltaT == true) {
@@ -197,8 +206,8 @@ bool CheckForFullEncoderRotation() {
 bool CheckForCriticalTemperature() {
   float temperature = 0;
   imu_data = myIMU.listenDataReady();
-  if( data == TEMP_DATA_READY) {
-    temperature = myIMU.readTempC;
+  if(imu_data == TEMP_DATA_READY) {
+    temperature = myIMU.readTempC();
     if(temperature >= CUT_OFF_TEMPERATURE){
       return true;
     }
