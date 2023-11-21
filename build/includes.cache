@@ -16,6 +16,21 @@
   },
   {
     "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/main.ino.cpp",
+    "Include": "SparkFunLSM6DSO.h",
+    "Includepath": "/Users/thomas/Documents/Arduino/libraries/SparkFunLSM6DSO"
+  },
+  {
+    "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/main.ino.cpp",
+    "Include": "Wire.h",
+    "Includepath": "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/Wire/src"
+  },
+  {
+    "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/main.ino.cpp",
+    "Include": "SPI.h",
+    "Includepath": "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/SPI/src"
+  },
+  {
+    "Sourcefile": "/Users/thomas/ArduinoProjects/sub/build/sketch/main.ino.cpp",
     "Include": "",
     "Includepath": null
   },
@@ -26,6 +41,21 @@
   },
   {
     "Sourcefile": "/Users/thomas/Documents/Arduino/libraries/Cytron_Motor_Drivers_Library/CytronMotorDriver.cpp",
+    "Include": "",
+    "Includepath": null
+  },
+  {
+    "Sourcefile": "/Users/thomas/Documents/Arduino/libraries/SparkFunLSM6DSO/SparkFunLSM6DSO.cpp",
+    "Include": "",
+    "Includepath": null
+  },
+  {
+    "Sourcefile": "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/Wire/src/Wire.cpp",
+    "Include": "",
+    "Includepath": null
+  },
+  {
+    "Sourcefile": "/Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/SPI/src/SPI.cpp",
     "Include": "",
     "Includepath": null
   }
