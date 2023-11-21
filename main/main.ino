@@ -11,13 +11,17 @@
 #define I2C_SDA 23
 #define I2C_SCL 22
 
+#define L1 15
+#define L2 32
+#define L3 14
+
 #define POT 34 // yellow potentiometer
 
 #define GEAR_RATIO 30
 #define COUNTS_PER_REVOLUTION 16
 
 float ENC_TO_ROT = 1.0 / (GEAR_RATIO * COUNTS_PER_REVOLUTION);
-float CUT_OFF_TEMPERATURE = 25.0;
+float CUT_OFF_TEMPERATURE = 30.0;
 float CUT_OFF_GYRO = 300;
 
 float temperature = 0.0;
@@ -61,6 +65,16 @@ enum states
 };
 enum states state = STOP;
 
+
+enum LEDS {
+  YELLOW,
+  RED1,
+  GREEN,
+  BLUE,
+  WHITE,
+  RED2
+};
+
 // Interrupt variables
 volatile bool deltaT = false;
 hw_timer_t *timer0 = NULL;
@@ -88,6 +102,7 @@ void readEncoder() {
 
 void setup(){
   Serial.begin(115200);
+  set_LED(4); // Initial blue 
   // delay(500);
 
   pinMode(EIN_A, INPUT_PULLUP);
@@ -125,6 +140,7 @@ void loop() {
       motor_on();                                                         // Service Function
       Serial.println("Manual start detected. Switching to state = MOVE"); // Print
       // for debugging
+      set_LED(3);
       state = MOVE;
     }
     break;
@@ -134,12 +150,14 @@ void loop() {
       motor_off();                                                               // Service Function
       Serial.println("Maximum temperature exceeded. Switching to state = STOP"); //
       // Print for debugging
+      set_LED(2);
       state = STOP;
     }
     if (CheckForCriticalGyro() == true) {                                 // Event Checker
       motor_off();                                                        // Service Function
       Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print
       // for debugging
+      set_LED(1);
       state = STOP;
     }
     break;
@@ -184,6 +202,7 @@ bool CheckForCriticalGyro() {
 void motor_on() {
   potValue = analogRead(POT);
   pwmValue = map(potValue, 0, POT_MAX, 0, 128);
+  pwmValue = 50;
   motor.setSpeed(pwmValue);
   Serial.print("Motor ON. Desired Motor PWM: ");
   Serial.println(pwmValue);
@@ -197,6 +216,61 @@ void motor_off() {
   Serial.println("Motor OFF");
   // Serial.println(position);
 }
+
+// Functions to control charlieplexing 
+void set_H(int pin) {
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+}
+
+void set_L(int pin) {
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, LOW);
+}
+
+void set_Z(int pin) {
+  pinMode(pin, INPUT);
+  digitalWrite(pin, LOW);
+}
+
+void set_LED(int var) {
+  switch (var)
+  {
+    case 1:
+      set_L(L1);
+      set_H(L2);
+      set_Z(L3);
+      break;
+
+    case 2:
+      set_H(L1);
+      set_L(L2);
+      set_Z(L3);
+      break;
+    
+    case 3:
+      set_Z(L1);
+      set_L(L2);
+      set_H(L3);
+      break;
+    case 4:
+      set_Z(L1);
+      set_H(L2);
+      set_L(L3);
+      break;
+    case 5:
+      set_L(L1);
+      set_Z(L2);
+      set_H(L3);
+      break;
+    case 6:
+      set_H(L1);
+      set_Z(L2);
+      set_L(L3);
+      break;
+  }  
+}
+
 
 // ************************ Other Functions ************************
 
