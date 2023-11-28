@@ -2,9 +2,9 @@
 # 2 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
 # 3 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
 # 4 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
-# 19 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
+# 23 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
 float ENC_TO_ROT = 1.0 / (30 * 16);
-float CUT_OFF_TEMPERATURE = 25.0;
+float CUT_OFF_TEMPERATURE = 30.0;
 float CUT_OFF_GYRO = 300;
 
 float temperature = 0.0;
@@ -48,12 +48,22 @@ enum states
 };
 enum states state = STOP;
 
+
+enum LEDS {
+  YELLOW,
+  RED1,
+  GREEN,
+  BLUE,
+  WHITE,
+  RED2
+};
+
 // Interrupt variables
 volatile bool deltaT = false;
 hw_timer_t *timer0 = 
-# 66 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 3 4
+# 80 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 3 4
                     __null
-# 66 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
+# 80 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
                         ;
 portMUX_TYPE timerMux0 = {.owner = 0xB33FFFFF,.count = 0} /**< Spinlock initializer */;
 portMUX_TYPE encoderMux = {.owner = 0xB33FFFFF,.count = 0} /**< Spinlock initializer */;
@@ -79,6 +89,7 @@ void readEncoder() {
 
 void setup(){
   Serial.begin(115200);
+  set_LED(4); // Initial blue 
   // delay(500);
 
   pinMode(26 /* YELLOW Encoder*/, 0x05);
@@ -116,6 +127,7 @@ void loop() {
       motor_on(); // Service Function
       Serial.println("Manual start detected. Switching to state = MOVE"); // Print
       // for debugging
+      set_LED(3);
       state = MOVE;
     }
     break;
@@ -125,12 +137,14 @@ void loop() {
       motor_off(); // Service Function
       Serial.println("Maximum temperature exceeded. Switching to state = STOP"); //
       // Print for debugging
+      set_LED(2);
       state = STOP;
     }
     if (CheckForCriticalGyro() == true) { // Event Checker
       motor_off(); // Service Function
       Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print
       // for debugging
+      set_LED(1);
       state = STOP;
     }
     break;
@@ -175,6 +189,7 @@ bool CheckForCriticalGyro() {
 void motor_on() {
   potValue = analogRead(34 /* yellow potentiometer*/);
   pwmValue = map(potValue, 0, POT_MAX, 0, 128);
+  pwmValue = 50;
   motor.setSpeed(pwmValue);
   Serial.print("Motor ON. Desired Motor PWM: ");
   Serial.println(pwmValue);
@@ -188,6 +203,61 @@ void motor_off() {
   Serial.println("Motor OFF");
   // Serial.println(position);
 }
+
+// Functions to control charlieplexing 
+void set_H(int pin) {
+  pinMode(pin, 0x03);
+  digitalWrite(pin, 0x1);
+}
+
+void set_L(int pin) {
+  pinMode(pin, 0x03);
+  digitalWrite(pin, 0x0);
+}
+
+void set_Z(int pin) {
+  pinMode(pin, 0x01);
+  digitalWrite(pin, 0x0);
+}
+
+void set_LED(int var) {
+  switch (var)
+  {
+    case 1:
+      set_L(15);
+      set_H(32);
+      set_Z(14);
+      break;
+
+    case 2:
+      set_H(15);
+      set_L(32);
+      set_Z(14);
+      break;
+
+    case 3:
+      set_Z(15);
+      set_L(32);
+      set_H(14);
+      break;
+    case 4:
+      set_Z(15);
+      set_H(32);
+      set_L(14);
+      break;
+    case 5:
+      set_L(15);
+      set_Z(32);
+      set_H(14);
+      break;
+    case 6:
+      set_H(15);
+      set_Z(32);
+      set_L(14);
+      break;
+  }
+}
+
 
 // ************************ Other Functions ************************
 

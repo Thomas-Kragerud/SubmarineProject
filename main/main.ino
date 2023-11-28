@@ -21,12 +21,10 @@
 #define COUNTS_PER_REVOLUTION 16
 
 float ENC_TO_ROT = 1.0 / (GEAR_RATIO * COUNTS_PER_REVOLUTION);
-float CUT_OFF_TEMPERATURE = 30.0;
+float CUT_OFF_TEMPERATURE = 30.0; // ºC
 float CUT_OFF_GYRO = 300;
 
 float temperature = 0.0;
-
-
 
 float GyroX = 0.0;
 float GyroY = 0.0;
@@ -61,7 +59,8 @@ CytronMD motor(PWM_DIR, MPIN_1, MPIN_2);
 enum states
 {
   STOP,
-  MOVE
+  MOVE,
+  OVERHEATED
 };
 enum states state = STOP;
 
@@ -127,6 +126,8 @@ void setup(){
   }
 }
 
+// ************************ Main Loop ************************
+
 void loop() {
   delay(10);
   if (deltaT == true) {
@@ -136,28 +137,41 @@ void loop() {
   switch (state) {
 
   case STOP:
+    if (CheckForCriticalTemperature() == true) {                                 // Event Checker
+      motor_off();                                                               // Service Function
+      Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); // Print for debugging
+      set_LED(2); // Red
+      state = OVERHEATED;
+    }
     if (CheckForEncoderRotation() == true) {                              // Event Checker
       motor_on();                                                         // Service Function
-      Serial.println("Manual start detected. Switching to state = MOVE"); // Print
-      // for debugging
-      set_LED(3);
+      Serial.println("Manual start detected. Switching to state = MOVE"); // Print for debugging
+      set_LED(3); // Green
       state = MOVE;
     }
+    
     break;
 
   case MOVE:
     if (CheckForCriticalTemperature() == true) {                                 // Event Checker
       motor_off();                                                               // Service Function
-      Serial.println("Maximum temperature exceeded. Switching to state = STOP"); //
-      // Print for debugging
-      set_LED(2);
-      state = STOP;
+      Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); //Print for debugging
+      set_LED(2); // Red
+      state = OVERHEATED;
     }
     if (CheckForCriticalGyro() == true) {                                 // Event Checker
       motor_off();                                                        // Service Function
-      Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print
-      // for debugging
-      set_LED(1);
+      Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print for debugging
+      set_LED(1); // Yellow
+      state = STOP;
+    }
+    break;
+
+  case OVERHEATED:
+    if (CheckForCriticalTemperature() == false) {                                 // Event Checker
+      motor_off();                                                               // Service Function
+      Serial.println("Temperature back to normal. Switching to state = STOP"); //Print for debugging
+      set_LED(1); // Yellow
       state = STOP;
     }
     break;
@@ -166,7 +180,7 @@ void loop() {
 
 // ************************ Event Checkers (Functions) ************************
 bool CheckForEncoderRotation() {
-  if (position != 0) {
+  if (abs(position) > 70) {
     return true;
   }
   else {
@@ -201,8 +215,8 @@ bool CheckForCriticalGyro() {
 // ************************ Service Functions ************************
 void motor_on() {
   potValue = analogRead(POT);
-  pwmValue = map(potValue, 0, POT_MAX, 0, 128);
-  pwmValue = 50;
+  pwmValue = map(potValue, 0, POT_MAX, 50, 128);
+  //pwmValue = 50;
   motor.setSpeed(pwmValue);
   Serial.print("Motor ON. Desired Motor PWM: ");
   Serial.println(pwmValue);
@@ -217,7 +231,7 @@ void motor_off() {
   // Serial.println(position);
 }
 
-// Functions to control charlieplexing 
+// ************************ Functions for LEDs (control charlieplexing) ************************
 void set_H(int pin) {
   pinMode(pin, OUTPUT);
   digitalWrite(pin, HIGH);
