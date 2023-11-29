@@ -1,7 +1,7 @@
 #include "CytronMotorDriver.h"  // Library for the Cytron motor driver card 
 #include "SparkFunLSM6DSO.h"    // Library for the LSM6DS0 IMU 
 #include <Wire.h>               // Wire library for I2C communicaition with the IMU 
-#include <Ticker.h>             // Ticker library for nonblocking count down timer 
+#include <Ticker.h>             // Ticker library for non-blocking countdown timer
 
 // Pin Definitions 
 #define EIN_A 26 // YELLOW Encoder A pin 
@@ -35,7 +35,7 @@ float GyroX = 0.0, GyroY = 0.0, GyroZ = 0.0;
 int POT_MAX = 4095; // Maximum value for 12-bit ADC
 int potValue = 0;
 int pwmValue = 0;
-int pos = 0;        // non critical section position 
+int pos = 0;        // Non-critical section position
 
 // IMU Setup
 LSM6DSO myIMU; // IMU object 
@@ -64,7 +64,7 @@ Ticker resetPositionTimer; // ticker object for reseting the position
 
 
 // Interrupt Service Routine for Timer
-// Every second we update the velocity  
+// Every second we update the velocity
 void IRAM_ATTR onTime0(){
   portENTER_CRITICAL_ISR(&encoderMux);
   velocity = prev_position - position;
@@ -73,19 +73,19 @@ void IRAM_ATTR onTime0(){
 }
 
 // Encoder Reading Function
-// Works by observing changes to magnetic field created by magnet attachet to motor shaft 
-// If A is high before B we are moving clockwise 
-// is B high before A we are moving counter clockwise 
-// The function is called by edge triggered interupt on A (A is high), then by checking B we can detirmin the direction 
+// Works by observing changes to the magnetic field created by a magnet attached to the motor shaft
+// If A is high before B, we are moving clockwise
+// If B is high before A, we are moving counter-clockwise
+// The function is called by an edge-triggered interrupt on A (when A is high), then by checking B we can determine the direction
 void readEncoder() {
   portENTER_CRITICAL_ISR(&encoderMux);
   encoderUpdated = true;
   int b = digitalRead(EIN_B);
-  if (b < 0) {
-    position++;
-  } else {
-    position--;
-  }
+  if (b == HIGH) {
+    posi++;  // If B is HIGH when A rises, increment position (clockwise rotation)
+    } else {
+      posi--;  // If B is LOW when A rises, decrement position (counterclockwise rotation)
+    }
   portEXIT_CRITICAL_ISR(&encoderMux);
 }
 
@@ -93,7 +93,7 @@ void readEncoder() {
 // Setup Function
 void setup(){
   Serial.begin(115200);
-  set_LED(BLUE); // Set LED blue indicating that we are booting up correctly 
+  set_LED(BLUE); // Set LED to blue, indicating that we are booting up correctly
 
   // Initialize Encoder Pins and Interrupt
   pinMode(EIN_A, INPUT_PULLUP);
@@ -101,11 +101,11 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(EIN_A), readEncoder, RISING);
 
   // Timer Setup for Velocity Calculation
-  // set the 0th HW timer to count upwards 
-  timer0 = timerBegin(0, 80, true);              // Devide by prescalar 80 to get 1MHz tick frequency  
-  timerAttachInterrupt(timer0, &onTime0, true);  // Attatch onTime0 function to timer 
-  timerAlarmWrite(timer0, 1000000, true);        // Alarm triggers once every second, resets after alarm triggered 
-  timerAlarmEnable(timer0);                      // Enable alarm 
+  // Set the 0th HW timer to count upwards
+  timer0 = timerBegin(0, 80, true);              // Divide by prescaler 80 to get 1MHz tick frequency
+  timerAttachInterrupt(timer0, &onTime0, true);  // Attach onTime0 function to timer
+  timerAlarmWrite(timer0, 1000000, true);        // Alarm triggers once every second, resets after being triggered
+  timerAlarmEnable(timer0);                      // Enable alarm
 
   // Setup for IMU
   Wire.begin(I2C_SDA, I2C_SCL);
@@ -121,7 +121,7 @@ void setup(){
 
 // ************************ Main Loop ************************
 void loop() {
-  delay(10); // Preventing prapid state changes 
+  delay(10); // Preventing rapid state changes
   if (encoderUpdated == true) {
     updateSpeedAndPos();
   }
@@ -215,7 +215,7 @@ void updateSpeedAndPos() {
 
   portENTER_CRITICAL(&encoderMux);
   encoderUpdated = false;
-  localPosition = -1 * position;
+  localPosition = position;
   localVelocity = velocity;
   portEXIT_CRITICAL(&encoderMux);
 
