@@ -16,7 +16,7 @@
 // LED Charlieplexing Control Pins
 #define L1 15 
 #define L2 32 
-#define L3 14
+#define L3 14 
 
 // Potentiometer Pin for Motor Speed Control
 #define POT 34 // YELLOW potentiometer
@@ -47,11 +47,12 @@ volatile int velocity = 0;
 volatile int prev_position = 0;
 float n_rotations = 0;
 float rpm = 0;
+bool enableUpdatePosition = true;
 
 CytronMD motor(PWM_DIR, MPIN_1, MPIN_2); // Motor driver object
 
 // State Machine Enums
-enum states { STOP, MOVE, OVERHEATED };
+enum states { STOP, MOVE_CW, MOVE_CCW, OVERHEATED };
 enum states state = STOP;
 
 enum LEDS { YELLOW, RED1, GREEN, BLUE, WHITE, RED2 };
@@ -78,15 +79,20 @@ void IRAM_ATTR onTime0(){
 // If B is high before A, we are moving counter-clockwise
 // The function is called by an edge-triggered interrupt on A (when A is high), then by checking B we can determine the direction
 void readEncoder() {
-  portENTER_CRITICAL_ISR(&encoderMux);
+  portENTER_CRITICAL_ISR(&encoderMux); // Entering and exiting two times the ISR allows for less time spent in them, and execute more complex ISR
   encoderUpdated = true;
   int b = digitalRead(EIN_B);
-  if (b == HIGH) {
-    posi++;  // If B is HIGH when A rises, increment position (clockwise rotation)
-    } else {
-      posi--;  // If B is LOW when A rises, decrement position (counterclockwise rotation)
-    }
   portEXIT_CRITICAL_ISR(&encoderMux);
+
+  if (enableUpdatePosition) { 
+    portENTER_CRITICAL_ISR(&encoderMux);
+    if (b == HIGH) {
+      position++;  // If B is HIGH when A rises, increment position (clockwise rotation)
+    } else {
+      position--;  // If B is LOW when A rises, decrement position (counterclockwise rotation)
+    }
+    portEXIT_CRITICAL_ISR(&encoderMux);
+  }
 }
 
 
@@ -127,33 +133,53 @@ void loop() {
   }
 
   switch (state) {
-  case STOP:
+    case STOP:
+      if (CheckForCriticalTemperature() == true) {                                       // Event Checker
+        motor_off();                                                                     // Service Function
+        Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); // Print for debugging
+        set_LED(RED1);                                                // Service Function
+        state = OVERHEATED;
+      }
+      if (CheckForEncoderRotationCW() == true) {                              // Event Checker
+        motor_on_CW();                                                         // Service Function
+        Serial.println("CW Manual start detected. Switching to state = MOVE_CW"); // Print for debugging
+        set_LED(GREEN);                                                // Service Function
+        state = MOVE_CW;
+      }
+      if (CheckForEncoderRotationCCW() == true) {                              // Event Checker
+        motor_on_CCW();                                                         // Service Function
+        Serial.println("CCW Manual start detected. Switching to state = MOVE_CCW"); // Print for debugging
+        set_LED(WHITE);                                                // Service Function
+        state = MOVE_CCW;
+      }
+      break;
+
+  case MOVE_CW:
     if (CheckForCriticalTemperature() == true) {                                       // Event Checker
       motor_off();                                                                     // Service Function
-      Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); // Print for debugging
-      set_LED(RED1); 
-      state = OVERHEATED;
-    }
-    if (CheckForEncoderRotation() == true) {                              // Event Checker
-      motor_on();                                                         // Service Function
-      Serial.println("Manual start detected. Switching to state = MOVE"); // Print for debugging
-      set_LED(GREEN); 
-      state = MOVE;
-    }
-    
-    break;
-
-  case MOVE:
-    if (CheckForCriticalTemperature() == true) {                                 // Event Checker
-      motor_off();                                                               // Service Function
       Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); //Print for debugging
-      set_LED(RED1); 
+      set_LED(RED1);                                                                   // Service Function
       state = OVERHEATED;
     }
     if (CheckForCriticalGyro() == true) {                                 // Event Checker
       motor_off();                                                        // Service Function
       Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print for debugging
-      set_LED(YELLOW); 
+      set_LED(YELLOW);                                                    // Service Function
+      state = STOP;
+    }
+    break;
+
+  case MOVE_CCW:
+    if (CheckForCriticalTemperature() == true) {                                       // Event Checker
+      motor_off();                                                                     // Service Function
+      Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); //Print for debugging
+      set_LED(RED1);                                                                   // Service Function
+      state = OVERHEATED;
+    }
+    if (CheckForCriticalGyro() == true) {                                 // Event Checker
+      motor_off();                                                        // Service Function
+      Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print for debugging
+      set_LED(YELLOW);                                                    // Service Function
       state = STOP;
     }
     break;
@@ -161,7 +187,8 @@ void loop() {
   case OVERHEATED:
     if (CheckForCriticalTemperature() == false) {                              // Event Checker
       Serial.println("Temperature back to normal. Switching to state = STOP"); //Print for debugging
-      set_LED(YELLOW); // Yellow
+      set_LED(YELLOW);                                                         // Service Function
+      reset_position();                                                        // (since we didn't turn motor off here as it is already off, we need to explicitly reset the position of the encoder)
       state = STOP;
     }
     break;
@@ -169,8 +196,12 @@ void loop() {
 }
 
 // ************************ Event Checkers (Functions) ************************
-bool CheckForEncoderRotation() {
-  return abs(position) > 70;
+bool CheckForEncoderRotationCW() { // Check for clockwise rotation
+  return position < -70; 
+}
+
+bool CheckForEncoderRotationCCW() { // Check for clockwise rotation
+  return position > 70; 
 }
 
 bool CheckForCriticalTemperature() {
@@ -186,16 +217,26 @@ bool CheckForCriticalGyro() {
 }
 
 // ************************ Service Functions ************************
-void motor_on() {
+void motor_on_CW() {
   potValue = analogRead(POT);
-  pwmValue = map(potValue, 0, POT_MAX, 0, 255);
+  pwmValue = map(potValue, 0, POT_MAX, 50, 128);
   motor.setSpeed(pwmValue);
-  Serial.print("Motor ON. Desired Motor PWM: ");
+  Serial.print("Motor ON (CW). Desired Motor PWM: ");
   Serial.println(pwmValue);
+}
+
+void motor_on_CCW() {
+  potValue = analogRead(POT);
+  pwmValue = map(potValue, 0, POT_MAX, 50, 128);
+  motor.setSpeed(-pwmValue);
+  Serial.print("Motor ON (CCW). Desired Motor PWM: ");
+  Serial.println(-pwmValue);
 }
 
 void motor_off() {
   motor.setSpeed(0);
+  position = 0;
+  enableUpdatePosition = false;
   resetPositionTimer.once(1, reset_position); // calls the reset position function after 1 sec 
   Serial.println("Motor OFF");
 }
@@ -205,6 +246,8 @@ void reset_position() {
   prev_position = 0;
   velocity = 0;
   rpm = 0;
+  enableUpdatePosition = true;
+  //resetPositionTimer.detach();
 }
 
 
@@ -274,5 +317,3 @@ void set_LED(LEDS color) {
       break;
   }  
 }
-
-

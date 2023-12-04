@@ -2,108 +2,116 @@
 # 2 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
 # 3 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
 # 4 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
-# 23 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
-float ENC_TO_ROT = 1.0 / (30 * 16);
-float CUT_OFF_TEMPERATURE = 30.0;
-float CUT_OFF_GYRO = 300;
+# 5 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 2
 
+// Pin Definitions 
+# 16 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
+// LED Charlieplexing Control Pins
+
+
+
+
+// Potentiometer Pin for Motor Speed Control
+
+
+// Constants Definitions
+
+
+
+float ENC_TO_ROT = 1.0 / (30 /* Gear ratio of the motor*/ * 16 /* Encoder counts per revolution */); // Encoder count to rotation conversion
+float CUT_OFF_TEMPERATURE = 30.0; // Temperature threshold in degrees Celsius
+float CUT_OFF_GYRO = 300; // Gyro threshold for movement detection
+
+// Sensor and Control Variables
 float temperature = 0.0;
-
-
-
-float GyroX = 0.0;
-float GyroY = 0.0;
-float GyroZ = 0.0;
-
-int POT_MAX = 4095;
+float GyroX = 0.0, GyroY = 0.0, GyroZ = 0.0;
+int POT_MAX = 4095; // Maximum value for 12-bit ADC
 int potValue = 0;
 int pwmValue = 0;
-int pos = 0;
+int pos = 0; // Non-critical section position
 
-// ************
-// Setup for IMU
-// Speed of Accelerometer up to 6.66 kHz
-// Buffer up to 9kB data between reads w bult in FIFO
-// Embedded temperatur sensor 16-bit
-// 2 Qwiic conncetors
-// 2 interrupt pins
-LSM6DSO myIMU;
-int imu_data;
+// IMU Setup
+LSM6DSO myIMU; // IMU object 
+int imu_data; // Variable to store IMU data 
 
-// ************
-// Setup for Encoder
+// Encoder Setup
 volatile int position = 0;
 volatile int velocity = 0;
-
 volatile int prev_position = 0;
 float n_rotations = 0;
 float rpm = 0;
-// Configure the motor driver.
-CytronMD motor(PWM_DIR, 13 /* white Motor*/, 12 /* yellow Motor*/);
+bool enableUpdatePosition = true;
 
-enum states
-{
-  STOP,
-  MOVE
-};
+CytronMD motor(PWM_DIR, 13 /* WHITE Motor Controll pin 1*/, 12 /* YELLOW Motor Controll pin 2*/); // Motor driver object
+
+// State Machine Enums
+enum states { STOP, MOVE_CW, MOVE_CCW, OVERHEATED };
 enum states state = STOP;
 
+enum LEDS { YELLOW, RED1, GREEN, BLUE, WHITE, RED2 };
 
-enum LEDS {
-  YELLOW,
-  RED1,
-  GREEN,
-  BLUE,
-  WHITE,
-  RED2
-};
-
-// Interrupt variables
-volatile bool deltaT = false;
+// Interrupt Management Variables
+volatile bool encoderUpdated = false;
 hw_timer_t *timer0 = 
-# 80 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 3 4
+# 62 "/Users/thomas/ArduinoProjects/sub/main/main.ino" 3 4
                     __null
-# 80 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
+# 62 "/Users/thomas/ArduinoProjects/sub/main/main.ino"
                         ;
-portMUX_TYPE timerMux0 = {.owner = 0xB33FFFFF,.count = 0} /**< Spinlock initializer */;
 portMUX_TYPE encoderMux = {.owner = 0xB33FFFFF,.count = 0} /**< Spinlock initializer */;
+Ticker resetPositionTimer; // ticker object for reseting the position 
 
+
+// Interrupt Service Routine for Timer
+// Every second we update the velocity
 void __attribute__((section(".iram1" "." "28"))) onTime0(){
-  vPortEnterCritical(&timerMux0);
+  vPortEnterCritical(&encoderMux);
   velocity = prev_position - position;
   prev_position = position;
-  vPortExitCritical(&timerMux0);
-}
-
-void readEncoder() {
-  vPortEnterCritical(&encoderMux);
-  deltaT = true;
-  int b = digitalRead(25 /* WHITE Encoder*/);
-  if (b < 0) {
-    position++;
-  } else {
-    position--;
-  }
   vPortExitCritical(&encoderMux);
 }
 
+// Encoder Reading Function
+// Works by observing changes to the magnetic field created by a magnet attached to the motor shaft
+// If A is high before B, we are moving clockwise
+// If B is high before A, we are moving counter-clockwise
+// The function is called by an edge-triggered interrupt on A (when A is high), then by checking B we can determine the direction
+void readEncoder() {
+  vPortEnterCritical(&encoderMux); // Entering and exiting two times the ISR allows for less time spent in them, and execute more complex ISR
+  encoderUpdated = true;
+  int b = digitalRead(25 /* WHITE Encoder B pin */);
+  vPortExitCritical(&encoderMux);
+
+  if (enableUpdatePosition) {
+    vPortEnterCritical(&encoderMux);
+    if (b == 0x1) {
+      position++; // If B is HIGH when A rises, increment position (clockwise rotation)
+    } else {
+      position--; // If B is LOW when A rises, decrement position (counterclockwise rotation)
+    }
+    vPortExitCritical(&encoderMux);
+  }
+}
+
+
+// Setup Function
 void setup(){
   Serial.begin(115200);
-  set_LED(4); // Initial blue 
-  // delay(500);
+  set_LED(BLUE); // Set LED to blue, indicating that we are booting up correctly
 
-  pinMode(26 /* YELLOW Encoder*/, 0x05);
-  pinMode(25 /* WHITE Encoder*/, 0x05);
-  attachInterrupt((((26 /* YELLOW Encoder*/)<40)?(26 /* YELLOW Encoder*/):-1), readEncoder, 0x01);
+  // Initialize Encoder Pins and Interrupt
+  pinMode(26 /* YELLOW Encoder A pin */, 0x05);
+  pinMode(25 /* WHITE Encoder B pin */, 0x05);
+  attachInterrupt((((26 /* YELLOW Encoder A pin */)<40)?(26 /* YELLOW Encoder A pin */):-1), readEncoder, 0x01);
 
-  timer0 = timerBegin(0, 80, true);
-  timerAttachInterrupt(timer0, &onTime0, true);
-
-  timerAlarmWrite(timer0, 1000000, true);
-  timerAlarmEnable(timer0);
+  // Timer Setup for Velocity Calculation
+  // Set the 0th HW timer to count upwards
+  timer0 = timerBegin(0, 80, true); // Divide by prescaler 80 to get 1MHz tick frequency
+  timerAttachInterrupt(timer0, &onTime0, true); // Attach onTime0 function to timer
+  timerAlarmWrite(timer0, 1000000, true); // Alarm triggers once every second, resets after being triggered
+  timerAlarmEnable(timer0); // Enable alarm
 
   // Setup for IMU
-  Wire.begin(23, 22);
+  Wire.begin(23 /* I2C SDA for IMU */, 22 /* I2C SCL for IMU */);
   if (myIMU.begin()){
     Serial.println("IMU Ready");
   } else {
@@ -114,37 +122,70 @@ void setup(){
   }
 }
 
+// ************************ Main Loop ************************
 void loop() {
-  delay(10);
-  if (deltaT == true) {
+  delay(10); // Preventing rapid state changes
+  if (encoderUpdated == true) {
     updateSpeedAndPos();
   }
 
   switch (state) {
+    case STOP:
+      if (CheckForCriticalTemperature() == true) { // Event Checker
+        motor_off(); // Service Function
+        Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); // Print for debugging
+        set_LED(RED1); // Service Function
+        state = OVERHEATED;
+      }
+      if (CheckForEncoderRotationCW() == true) { // Event Checker
+        motor_on_CW(); // Service Function
+        Serial.println("CW Manual start detected. Switching to state = MOVE_CW"); // Print for debugging
+        set_LED(GREEN); // Service Function
+        state = MOVE_CW;
+      }
+      if (CheckForEncoderRotationCCW() == true) { // Event Checker
+        motor_on_CCW(); // Service Function
+        Serial.println("CCW Manual start detected. Switching to state = MOVE_CCW"); // Print for debugging
+        set_LED(WHITE); // Service Function
+        state = MOVE_CCW;
+      }
+      break;
 
-  case STOP:
-    if (CheckForEncoderRotation() == true) { // Event Checker
-      motor_on(); // Service Function
-      Serial.println("Manual start detected. Switching to state = MOVE"); // Print
-      // for debugging
-      set_LED(3);
-      state = MOVE;
-    }
-    break;
-
-  case MOVE:
+  case MOVE_CW:
     if (CheckForCriticalTemperature() == true) { // Event Checker
       motor_off(); // Service Function
-      Serial.println("Maximum temperature exceeded. Switching to state = STOP"); //
-      // Print for debugging
-      set_LED(2);
-      state = STOP;
+      Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); //Print for debugging
+      set_LED(RED1); // Service Function
+      state = OVERHEATED;
     }
     if (CheckForCriticalGyro() == true) { // Event Checker
       motor_off(); // Service Function
-      Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print
-      // for debugging
-      set_LED(1);
+      Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print for debugging
+      set_LED(YELLOW); // Service Function
+      state = STOP;
+    }
+    break;
+
+  case MOVE_CCW:
+    if (CheckForCriticalTemperature() == true) { // Event Checker
+      motor_off(); // Service Function
+      Serial.println("Maximum temperature exceeded. Switching to state = OVERHEATED"); //Print for debugging
+      set_LED(RED1); // Service Function
+      state = OVERHEATED;
+    }
+    if (CheckForCriticalGyro() == true) { // Event Checker
+      motor_off(); // Service Function
+      Serial.println("Maximum gyro exceeded. Switching to state = STOP"); // Print for debugging
+      set_LED(YELLOW); // Service Function
+      state = STOP;
+    }
+    break;
+
+  case OVERHEATED:
+    if (CheckForCriticalTemperature() == false) { // Event Checker
+      Serial.println("Temperature back to normal. Switching to state = STOP"); //Print for debugging
+      set_LED(YELLOW); // Service Function
+      reset_position(); // (since we didn't turn motor off here as it is already off, we need to explicitly reset the position of the encoder)
       state = STOP;
     }
     break;
@@ -152,120 +193,124 @@ void loop() {
 }
 
 // ************************ Event Checkers (Functions) ************************
-bool CheckForEncoderRotation() {
-  if (position != 0) {
-    return true;
-  }
-  else {
-    return false;
-  }
+bool CheckForEncoderRotationCW() { // Check for clockwise rotation
+  return position < -70;
+}
+
+bool CheckForEncoderRotationCCW() { // Check for clockwise rotation
+  return position > 70;
 }
 
 bool CheckForCriticalTemperature() {
   temperature = myIMU.readTempC();
-  // Serial.println(temperature);
-  if (temperature >= CUT_OFF_TEMPERATURE) {
-    return true;
-  }
-  else {
-    return false;
-  }
+  return temperature >= CUT_OFF_TEMPERATURE;
 }
 
 bool CheckForCriticalGyro() {
   GyroX = myIMU.readFloatGyroX();
   GyroY = myIMU.readFloatGyroY();
-
   GyroZ = myIMU.readFloatGyroZ();
-  // Serial.println(temperature);
-  if ((abs(GyroX) >= CUT_OFF_GYRO) || (abs(GyroY) >= CUT_OFF_GYRO) || (abs(GyroZ) >= CUT_OFF_GYRO)){
-    return true;
-  } else {
-    return false;
-  }
+  return (abs(GyroX) >= CUT_OFF_GYRO) || (abs(GyroY) >= CUT_OFF_GYRO) || (abs(GyroZ) >= CUT_OFF_GYRO);
 }
 
 // ************************ Service Functions ************************
-void motor_on() {
-  potValue = analogRead(34 /* yellow potentiometer*/);
-  pwmValue = map(potValue, 0, POT_MAX, 0, 128);
-  pwmValue = 50;
+void motor_on_CW() {
+  potValue = analogRead(34 /* YELLOW potentiometer*/);
+  pwmValue = map(potValue, 0, POT_MAX, 50, 128);
   motor.setSpeed(pwmValue);
-  Serial.print("Motor ON. Desired Motor PWM: ");
+  Serial.print("Motor ON (CW). Desired Motor PWM: ");
   Serial.println(pwmValue);
+}
+
+void motor_on_CCW() {
+  potValue = analogRead(34 /* YELLOW potentiometer*/);
+  pwmValue = map(potValue, 0, POT_MAX, 50, 128);
+  motor.setSpeed(-pwmValue);
+  Serial.print("Motor ON (CCW). Desired Motor PWM: ");
+  Serial.println(-pwmValue);
 }
 
 void motor_off() {
   motor.setSpeed(0);
-  delay(1000); // Need to wait for motor to stop rotating (body with high interia)
   position = 0;
-
+  enableUpdatePosition = false;
+  resetPositionTimer.once(1, reset_position); // calls the reset position function after 1 sec 
   Serial.println("Motor OFF");
-  // Serial.println(position);
 }
 
-// Functions to control charlieplexing 
+void reset_position() {
+  position = 0;
+  prev_position = 0;
+  velocity = 0;
+  rpm = 0;
+  enableUpdatePosition = true;
+  //resetPositionTimer.detach();
+}
+
+
+// Update rpm, pos and rotation count 
+void updateSpeedAndPos() {
+  int localPosition;
+  int localVelocity;
+
+  vPortEnterCritical(&encoderMux);
+  encoderUpdated = false;
+  localPosition = position;
+  localVelocity = velocity;
+  vPortExitCritical(&encoderMux);
+
+  pos = localPosition;
+  n_rotations = pos * ENC_TO_ROT;
+  rpm = localVelocity * ENC_TO_ROT * 60;
+}
+
+
+// ************************ Functions for LEDs (control charlieplexing) ************************
+// Implementing charlieplexing, a technique uest to control multiple LEDs with fewer I/O pins 
+// exploiting the tristate capabilities of the microcontroller, this means that pins can be both on off and "disconnected"
+
+// Set LED pin to high (sourcing current)
 void set_H(int pin) {
   pinMode(pin, 0x03);
   digitalWrite(pin, 0x1);
 }
 
+// Set LED pin to low (sinking current)
 void set_L(int pin) {
   pinMode(pin, 0x03);
   digitalWrite(pin, 0x0);
 }
 
+// Set LED pin to Z (high-impedans)
 void set_Z(int pin) {
-  pinMode(pin, 0x01);
-  digitalWrite(pin, 0x0);
+  pinMode(pin, 0x01); // Put pin in high-impedans state, neither souces nor sinks current 
+  digitalWrite(pin, 0x0); // Enable internal pull-down resistor, ensure pin pulled to low voltage 
 }
 
-void set_LED(int var) {
-  switch (var)
+void set_LED(LEDS color) {
+  switch (color)
   {
-    case 1:
-      set_L(15);
-      set_H(32);
-      set_Z(14);
+    case YELLOW:
+      set_L(15); set_H(32); set_Z(14);
       break;
 
-    case 2:
-      set_H(15);
-      set_L(32);
-      set_Z(14);
+    case RED1:
+      set_H(15); set_L(32); set_Z(14);
       break;
 
-    case 3:
-      set_Z(15);
-      set_L(32);
-      set_H(14);
+    case GREEN:
+      set_Z(15); set_L(32); set_H(14);
       break;
-    case 4:
-      set_Z(15);
-      set_H(32);
-      set_L(14);
+
+    case BLUE:
+      set_Z(15); set_H(32); set_L(14);
       break;
-    case 5:
-      set_L(15);
-      set_Z(32);
-      set_H(14);
+
+    case WHITE:
+      set_L(15); set_Z(32); set_H(14);
       break;
-    case 6:
-      set_H(15);
-      set_Z(32);
-      set_L(14);
+    case RED2:
+      set_H(15); set_Z(32); set_L(14);
       break;
   }
-}
-
-
-// ************************ Other Functions ************************
-
-void updateSpeedAndPos() {
-  vPortEnterCritical(&encoderMux);
-  deltaT = false;
-  pos = -1 * position;
-  vPortExitCritical(&encoderMux);
-  n_rotations = pos * ENC_TO_ROT;
-  rpm = velocity * ENC_TO_ROT * 60;
 }

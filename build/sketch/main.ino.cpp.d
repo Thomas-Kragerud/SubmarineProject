@@ -137,4 +137,5 @@
  /Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/Wire/src/Wire.h \
  /Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/cores/esp32/esp32-hal.h \
  /Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/SPI/src/SPI.h \
- /Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/cores/esp32/esp32-hal-spi.h
+ /Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/cores/esp32/esp32-hal-spi.h \
+ /Users/thomas/Library/Arduino15/packages/esp32/hardware/esp32/2.0.14/libraries/Ticker/src/Ticker.h
